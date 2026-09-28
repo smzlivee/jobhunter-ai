@@ -43,6 +43,21 @@ def _ensure_backend_runtime(backend_python: Path):
 
 
 def main():
+    backend_proc = None
+    frontend_proc = None
+
+    def _cleanup():
+        for proc in (backend_proc, frontend_proc):
+            if proc and proc.poll() is None:
+                proc.terminate()
+        for proc in (backend_proc, frontend_proc):
+            if not proc:
+                continue
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
     try:
         _require_cmd("npm")
         backend_python = _find_backend_python()
@@ -63,14 +78,7 @@ def main():
         print("✅ 已启动。按 Ctrl+C 统一停止前后端。")
 
         def _stop(*_):
-            for proc in (backend_proc, frontend_proc):
-                if proc.poll() is None:
-                    proc.terminate()
-            for proc in (backend_proc, frontend_proc):
-                try:
-                    proc.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
+            _cleanup()
             sys.exit(0)
 
         signal.signal(signal.SIGINT, _stop)
@@ -83,6 +91,7 @@ def main():
                 raise RuntimeError("前端进程已退出，请检查日志。")
             time.sleep(1)
     except Exception as exc:
+        _cleanup()
         print(f"❌ 启动失败: {exc}")
         sys.exit(1)
 

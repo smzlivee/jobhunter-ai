@@ -2,6 +2,7 @@ import asyncio
 import os
 import sqlite3
 import sys
+import threading
 from typing import Annotated, TypedDict
 
 import requests
@@ -199,6 +200,7 @@ SYSTEM_PROMPT = f"""你是一个顶级的高情商 AI 求职助理 Agent。你�
 """
 
 _llm = None
+_llm_lock = threading.Lock()
 
 
 def _get_llm():
@@ -206,17 +208,20 @@ def _get_llm():
     global _llm
     if _llm is not None:
         return _llm
-    if not settings.OPENAI_API_KEY:
-        raise RuntimeError("ChatOps 未配置 OPENAI_API_KEY，请在 .env 或系统配置页填写后重试。")
-    if not settings.OPENAI_MODEL:
-        raise RuntimeError("ChatOps 未配置 OPENAI_MODEL，请在 .env 或系统配置页填写后重试。")
-    _llm = ChatOpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL,
-        model=settings.OPENAI_MODEL,
-        temperature=0.1,
-        timeout=180,  # 供应商网关挂起时必须有超时兜底，否则用户「思考中」后永久沉默且线程被占死
-    ).bind_tools(tools)
+    with _llm_lock:
+        if _llm is not None:
+            return _llm
+        if not settings.OPENAI_API_KEY:
+            raise RuntimeError("ChatOps 未配置 OPENAI_API_KEY，请在 .env 或系统配置页填写后重试。")
+        if not settings.OPENAI_MODEL:
+            raise RuntimeError("ChatOps 未配置 OPENAI_MODEL，请在 .env 或系统配置页填写后重试。")
+        _llm = ChatOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL,
+            model=settings.OPENAI_MODEL,
+            temperature=0.1,
+            timeout=180,  # 供应商网关挂起时必须有超时兜底，否则用户「思考中」后永久沉默且线程被占死
+        ).bind_tools(tools)
     return _llm
 
 def agent_node(state: JobHunterState):
