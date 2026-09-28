@@ -198,19 +198,32 @@ SYSTEM_PROMPT = f"""你是一个顶级的高情商 AI 求职助理 Agent。你�
 12. 回复简洁有力，用 emoji 分段，不要啰嗦。
 """
 
-llm = ChatOpenAI(
-    api_key=settings.OPENAI_API_KEY,
-    base_url=settings.OPENAI_BASE_URL,
-    model=settings.OPENAI_MODEL,
-    temperature=0.1,
-    timeout=180,  # 供应商网关挂起时必须有超时兜底，否则用户「思考中」后永久沉默且线程被占死
-).bind_tools(tools)
+_llm = None
+
+
+def _get_llm():
+    """惰性初始化 ChatOps LLM，避免缺配置时阻断后端启动。"""
+    global _llm
+    if _llm is not None:
+        return _llm
+    if not settings.OPENAI_API_KEY:
+        raise RuntimeError("ChatOps 未配置 OPENAI_API_KEY，请在 .env 或系统配置页填写后重试。")
+    if not settings.OPENAI_MODEL:
+        raise RuntimeError("ChatOps 未配置 OPENAI_MODEL，请在 .env 或系统配置页填写后重试。")
+    _llm = ChatOpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        base_url=settings.OPENAI_BASE_URL,
+        model=settings.OPENAI_MODEL,
+        temperature=0.1,
+        timeout=180,  # 供应商网关挂起时必须有超时兜底，否则用户「思考中」后永久沉默且线程被占死
+    ).bind_tools(tools)
+    return _llm
 
 def agent_node(state: JobHunterState):
     messages = state["messages"]
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
-    response = llm.invoke(messages)
+    response = _get_llm().invoke(messages)
     return {"messages": [response]}
 
 workflow = StateGraph(JobHunterState)
