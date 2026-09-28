@@ -99,6 +99,12 @@ npm run dev                          # 启动 http://localhost:3000
 ```
 
 > Windows 用户可直接双击 `start_all.bat` 一键拉起前后端。
+>
+> Python 环境用户可在仓库根目录执行：
+> ```bash
+> python start_all.py
+> ```
+> 脚本会先执行 `frontend/npm install`，然后同时启动后端与前端，`Ctrl+C` 可统一停止。
 
 ### 新机自检（点「启动全链路」之前，先跑这条命令）
 
